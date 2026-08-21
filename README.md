@@ -1,83 +1,85 @@
-# vpn-deploy-kit · 部署工具集
+# vpn-deploy-toolkit · 一键全自动 VPN 部署
 
-在全新 Ubuntu VPS 上部署双协议 VPN **Reality(VLESS/tcp 443) + Hysteria2(udp 8443)**，并生成 Clash Verge 客户端配置。
-本仓库是**脱敏模板版**：可安全公开，供同事复用自己的服务器部署。
+在全新 Ubuntu VPS 上**一键部署双协议 VPN：Reality(VLESS/tcp 443) + Hysteria2(udp 8443)**，并自动生成 Clash Verge 客户端配置。
+**单仓库自包含**——克隆下来，设 3 个环境变量，跑一条命令即可，无需再拉任何其他仓库。
 
-> ⚠️ 不含任何真实服务器凭据。部署时通过环境变量传入你自己的 VPS 信息（见下）。
+> 本仓库为**脱敏版**：不含任何真实服务器凭据，可安全公开。凭据通过环境变量传入。
 
 ## 特性
-- 双协议高可用：Reality（抗封锁 TCP）+ Hysteria2（UDP 低延迟），任一可用即可上网
-- 与 **3x-ui v2.9.4** 完全兼容（含 v2.9.4 面板认证模型迁移）
-- 一键部署 + 客户端分流规则（chatgpt/openai 走代理，国内站直连）
-- 全程 Python(paramiko) 驱动，适配 **Windows Git Bash**（无 sleep/chmod/which 的环境）
+- ✅ **一键全自动**：上传套件 → 部署 → 回收客户端配置，一条 `python deploy.py` 搞定
+- ✅ **兼容 3x-ui v2.9.4**：已内置面板认证模型迁移（secret）与全部踩坑修复
+- ✅ **双协议高可用**：Reality（TCP 抗封锁）+ Hysteria2（UDP 低延迟），任一可用即可连
+- ✅ 客户端分流规则完善：chatgpt/openai 走代理，国内站直连
+- ✅ 适配 **Windows Git Bash**（paramiko 驱动，无 sleep/chmod/which 也可用）
 
-## 快速开始
+## 快速开始（同事视角，30 秒上手）
 
-### 0. 准备
-- 一台全新 Ubuntu 22.04 VPS（root 权限）
-- 本机装 Python 3.10+，`pip install paramiko`
-- 部署公钥（可选；若 sshd 禁公钥则用密码）
-
-### 1. 配置你的 VPS 凭据（环境变量，不进 git）
 ```bash
-export VPN_HOST=<你的VPS IP>
-export VPN_PORT=<SSH端口>
+# 0. 克隆并装依赖
+git clone https://github.com/deepseekexpo-sketch/vpn-deploy-toolkit.git
+cd vpn-deploy-toolkit
+pip install paramiko
+
+# 1. 设置你的 VPS 凭据（环境变量，命令结束后即失效，不会入库）
+export VPN_HOST=<你的VPS公网IP>
+export VPN_PORT=<SSH端口>        # 可选，默认 22
 export VPN_USER=root
 export VPN_PASS=<root密码>
+
+# 2. 一键全自动部署
+python deploy.py
 ```
 
-### 2. 部署三步
-```bash
-# ① 连接测试 + 注入部署公钥 + 环境探测
-export VPN_PUBFILE="<你的公钥路径>"
-python scripts/ssh_init_new.py
+部署完成后：
+- VPS 上自动监听 **443/tcp（Reality）+ 8443/udp（Hysteria2）**
+- 客户端配置自动拉到 **`deliverables/client-<IP>.yaml`** 和 `deliverables/secrets-<IP>.md`
 
-# ② 上传 vpn-deploy-kit 套件到 VPS /opt/vpn-deploy-kit/
-python scripts/upload_kit_new.py
+### Clash Verge 导入
+1. 删旧配置 → 导入 `deliverables/client-<IP>.yaml` → 激活
+2. **必须关闭 Verge「设置 → DNS 设置」开关**，否则会覆盖配置里的 DNS（致 ChatGPT 回源、国内站 5s 慢）
 
-# ③ 跑 bootstrap 一键部署（去CRLF→语法检查→部署→轮询）
-python scripts/exec_deploy_new.py
+*注：`python deploy.py` 结束后环境变量仍在当前 shell，若担心可 `unset VPN_PASS`。*
+
+## 仓库结构
+
 ```
-成功后 VPS 监听：**443/tcp(Reality) + 8443/udp(Hysteria2)**。
-
-### 3. 回收客户端配置
-```bash
-# 用 paramiko 拉取 VPS 上 /opt/vpn-deploy-kit/output/client-<IP>.yaml 和 secrets-<IP>.md
+vpn-deploy-toolkit/
+├── deploy.py               # ★ 一键全自动入口（跑这个就行）
+├── kit/                    # vpn-deploy-kit 完整套件（自包含，带 v2.9.4 修复）
+│   ├── bootstrap.sh        # 编排器
+│   ├── config.example.env  # 配置模板
+│   ├── scripts/            # 00-precheck … 08-gen-client-yaml + lib.sh
+│   ├── templates/          # Reality/Hysteria2/客户端模板
+│   └── tests/              # 模板渲染测试
+├── scripts/                # （调试用）分步部署辅助脚本，环境变量版
+├── templates/
+│   └── client.example.yaml # 客户端配置格式参考（占位示例）
+└── deliverables/           # 部署后自动生成（gitignore，不入库）
 ```
 
-### 4. Clash Verge 导入
-1. 删旧配置 → 导入 `client-<IP>.yaml` → 激活
-2. **必须关闭 Verge「设置→DNS 设置」开关**，否则会覆盖配置里的 DNS（致 ChatGPT 回源、国内站 5s 慢）
+## 部署原理
 
-## 部署脚本清单
-| 脚本 | 作用 |
+`deploy.py` 自动完成 5 步：
+1. 用环境变量生成 `kit/config.env`（写入你的 VPS IP / SSH 端口 / 公钥）
+2. SFTP 上传整个 `kit/` 到 VPS `/opt/vpn-deploy-kit/`
+3. 远程去除 CRLF + `bash -n` 语法检查
+4. 跑 `bootstrap.sh`（Reality 443 + Hysteria2 8443），幂等可重跑
+5. 回收客户端配置到 `deliverables/`
+
+## 常见问题
+
+| 问题 | 处理 |
 |------|------|
-| `ssh_init_new.py` | 密码连 + 注入公钥(幂等) + 探测 OS/arch/x-ui/jq |
-| `upload_kit_new.py` | SFTP 上传套件到 /opt/vpn-deploy-kit/ + 远程验证 |
-| `deploy_remote.sh` | 远程：去 CRLF + bash -n + reset state + 停残留 + 跑 bootstrap |
-| `exec_deploy_new.py` | 上传 deploy_remote.sh 并阻塞执行（长超时） |
-| `manual_reality.sh` | (备用) x-ui 重启竞态兜底的手动 Reality 部署 |
-
-远程套件需配齐：`bootstrap.sh`、`config.env`、`scripts/00-08`、`templates/`、`tests/`
-（本项目为精简版，完整套件在 [原仓库](https://github.com/chieven-sys/vpn-deploy-kit)，按需复制）。
-
-## ⚠️ 踩坑速查表（x-ui v2.9.4，部署前必读）
-
-| # | 症状 | 根因 | 修复 |
-|---|------|------|------|
-| 1 | 上传后脚本全崩 `$'\r'` | 本地 .sh 是 CRLF | 远程 `sed -i 's/\r$//' bootstrap.sh scripts/*.sh` |
-| 2 | bootstrap rc=1 无日志 | 重定向时 output 目录不存在 | 先 `mkdir -p output` |
-| 3 | `jq: command not found` | 系统缺 jq | `apt-get install -y jq` |
-| 4 | 03 卡死 "already in use" | **v2.9.4 旧 `x-ui setting` CLI 失效** | 改用 sqlite 写 `settings.secret`；面板锁 2053 用 `iptables !-i lo` + ufw deny；port precheck 仅 FORCE=0 |
-| 5 | curl 校验失败 | panel 绑 `*`，IPv6 回环 `[::1]` 不通 | 用 IPv4 回环 `curl http://127.0.0.1:2053/` |
-| 6 | 脚本 exit 28 | `$(curl ...)` 超时触 `set -e` | `code="$(curl ... || true)"` |
-| 7 | x-ui 装完无 db | install.sh 不自动建 db | 手动 `x-ui start` 生成 `/etc/x-ui/x-ui.db` |
-| 8 | xray 26.x 密钥解析失败 | 输出格式变 `PrivateKey:` | 用 `grep -iE 'private[[:space:]]*key' \| sed 's/^[^:]*:[[:space:]]*//'` |
+| `连接失败: …` | 检查 VPN_HOST/PORT/PASS；SSH 被 fail2ban 封则去商家 VNC 解封本机 IP |
+| 部署失败卡在 `03-install-3xui` | 已内置 v2.9.4 修复；必要时重设 `VPN_*` 后重跑 `python deploy.py`（幂等） |
+| `jq: command not found` | kit 部署前会自动 `apt-get install -y jq`（bootstrap 前置） |
+| 导入后 ChatGPT 打不开 | 未关闭 Verge「DNS 设置」开关 → 关掉重启 |
 
 ## 安全说明
-- 部署脚本通过环境变量读凭据，**仓库内无任何真实密码/IP/密钥**
-- 客户端 yaml / secrets 含节点凭据，**切勿提交**——用示例模板 `templates/client.example.yaml`
+- 仓库**不含任何真实密码/IP/密钥**，凭据全走环境变量
+- `kit/config.env`、`deliverables/` 等含凭据文件已被 `.gitignore` 排除
 - 面板（3x-ui 2053）默认仅本机/SSH 隧道可访问（iptables + ufw deny）
+- 完整踩坑记录见 `kit/DESIGN.md`（含 3x-ui v2.9.4 兼容说明）
 
 ## License
 MIT

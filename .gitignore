@@ -1,11 +1,15 @@
 # 防止真实凭据误提交
 # === 用户输入(每台 VPS 独立) ===
 config.env
+kit/config.env
 
 # === 部署产出(含 secrets/密钥) ===
 output/
 output/*.yaml
 output/secrets*.md
+deliverables/
+deliverables/*.yaml
+deliverables/secrets*.md
 
 # === 连接信息 ===
 vps.md

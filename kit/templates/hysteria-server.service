@@ -1,0 +1,15 @@
+[Unit]
+Description=Hysteria 2 Server
+After=network.target
+
+[Service]
+Type=simple
+User=hysteria
+Group=hysteria
+ExecStart=/usr/local/bin/hysteria-server server --config /etc/hysteria/config.yaml
+Restart=on-failure
+RestartSec=5
+LimitNOFILE=65535
+
+[Install]
+WantedBy=multi-user.target

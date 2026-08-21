@@ -1,0 +1,22 @@
+listen: :${HY2_PORT}
+
+tls:
+  cert: /etc/hysteria/cert/server.crt
+  key: /etc/hysteria/cert/server.key
+
+auth:
+  type: password
+  password: ${HY2_PASS}
+
+masquerade:
+  type: proxy
+  proxy:
+    url: ${HY2_MASQUERADE}
+    rewriteHost: true
+
+quic:
+  initReceiveWindow: 16777216
+  maxReceiveWindow: 67108864
+  minReceiveWindow: 1048576
+  maxIdleTimeout: 30s
+  maxIncomingStreams: 1024
