@@ -1,0 +1,24 @@
+# 防止真实凭据误提交
+# === 用户输入(每台 VPS 独立) ===
+config.env
+
+# === 部署产出(含 secrets/密钥) ===
+output/
+output/*.yaml
+output/secrets*.md
+
+# === 连接信息 ===
+vps.md
+*.hosts
+
+# === 证书/密钥任何形式 ===
+*.pem
+*.key
+*.crt
+id_ed25519*
+id_rsa*
+*.pub
+
+# === 独立的 secrets 文件 ===
+*secrets*.md
+*secret*.json

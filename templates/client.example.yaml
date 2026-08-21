@@ -1,0 +1,116 @@
+# 客户端配置模板示例 — 仅供格式参考, 切勿直接使用
+# 部署后请从 VPS 拉取真实的 client-<IP>.yaml(含你的真实 UUID/密钥)
+# Clash Verge 导入: 删旧配置 → import 此文件 → 激活
+# ⚠️ 必须关闭 Verge "设置 → DNS 设置" 开关, 否则覆盖本文件 dns 段
+
+mixed-port: 7890
+allow-lan: false
+mode: rule
+log-level: info
+ipv6: false
+
+dns:
+  enable: true
+  listen: :53
+  ipv6: false
+  enhanced-mode: fake-ip
+  fake-ip-range: 198.18.0.1/16
+  fake-ip-filter:
+    - '*.lan'
+    - '*.local'
+    - '*.arpa'
+    - localhost.ptlogin2.qq.com
+    - time.*.com
+    - ntp.*.com
+  default-nameserver:
+    - 223.5.5.5
+    - 119.29.29.29
+  respect-rules: true
+  nameserver:
+    - https://1.1.1.1/dns-query
+    - https://8.8.8.8/dns-query
+  nameserver-policy:
+    'geosite:cn,private':
+      - https://223.5.5.5/dns-query
+      - https://120.53.53.53/dns-query
+  proxy-server-nameserver:
+    - https://223.5.5.5/dns-query
+
+proxies:
+  # ===== 把下面 <占位> 替换为 VPS 实际值 =====
+  - name: "REALITY-节点"
+    type: vless
+    server: <你的VPS_IP>          # 例如 1.2.3.4
+    port: 443
+    uuid: "<你的UUID>"
+    network: tcp
+    udp: true
+    flow: xtls-rprx-vision
+    tls: true
+    servername: addons.mozilla.org
+    reality-opts:
+      public-key: "<你的Reality公钥>"
+      short-id: "<你的ShortID>"
+    client-fingerprint: chrome
+
+  - name: "HY2-节点"
+    type: hysteria2
+    server: <你的VPS_IP>
+    port: 8443
+    password: "<Hysteria2密码>"
+    sni: www.microsoft.com
+    skip-cert-verify: true
+    alpn:
+      - h3
+
+proxy-groups:
+  - name: PROXY
+    type: select
+    proxies:
+      - REALITY-节点
+      - HY2-节点
+      - AUTO
+      - DIRECT
+
+  - name: AUTO
+    type: url-test
+    proxies:
+      - REALITY-节点
+      - HY2-节点
+    url: https://www.gstatic.com/generate_204
+    interval: 300
+
+rules:
+  # 防 mihomo loop: 节点 server IP 必须 DIRECT
+  - IP-CIDR,<你的VPS_IP>/32,DIRECT,no-resolve
+
+  # 受污染域名显式走代理
+  - DOMAIN-SUFFIX,chatgpt.com,PROXY
+  - DOMAIN-SUFFIX,openai.com,PROXY
+  - DOMAIN-SUFFIX,oaistatic.com,PROXY
+  - DOMAIN-SUFFIX,oaiusercontent.com,PROXY
+
+  # GFW 黑名单全走代理
+  - GEOSITE,gfw,PROXY
+
+  # 国内直连
+  - DOMAIN-SUFFIX,cn,DIRECT
+  - DOMAIN-SUFFIX,baidu.com,DIRECT
+  - DOMAIN-SUFFIX,qq.com,DIRECT
+  - DOMAIN-SUFFIX,taobao.com,DIRECT
+  - DOMAIN-SUFFIX,tmall.com,DIRECT
+  - DOMAIN-SUFFIX,jd.com,DIRECT
+  - DOMAIN-SUFFIX,bilibili.com,DIRECT
+  - DOMAIN-SUFFIX,163.com,DIRECT
+  - DOMAIN-SUFFIX,126.com,DIRECT
+  - DOMAIN-SUFFIX,zhihu.com,DIRECT
+  - DOMAIN-SUFFIX,douyin.com,DIRECT
+  - DOMAIN-SUFFIX,weibo.com,DIRECT
+  - DOMAIN-SUFFIX,alipay.com,DIRECT
+  - DOMAIN-SUFFIX,aliyun.com,DIRECT
+  - DOMAIN-SUFFIX,tencentcloud.com,DIRECT
+
+  # GeoIP 兜底
+  - GEOIP,LAN,DIRECT
+  - GEOIP,CN,DIRECT
+  - MATCH,PROXY
